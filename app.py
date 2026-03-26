@@ -23,7 +23,6 @@ class Product(db.Model):
     price = db.Column(db.Integer, nullable=False)
     img = db.Column(db.String(50), nullable=False)
 
-# The Secure Customer Model
 class Customer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False)
@@ -40,13 +39,16 @@ class Order(db.Model):
 
 # --- 3. Auto-Initialization ---
 with app.app_context():
-    # db.drop_all() # Uncomment this line temporarily if you need to wipe old data
+    
+    # 🚨 DANGER ZONE: This line deletes the old, broken database tables!
+    db.drop_all() 
+    
+    # This line builds the brand new, secure tables!
     db.create_all()
     
     if not AdminUser.query.filter_by(username='admin').first():
         db.session.add(AdminUser(username='admin', password='123'))
         db.session.commit()
-        print("Admin account verified")
         
     if Product.query.count() == 0:
         default_items = [
@@ -77,13 +79,11 @@ def register():
         email = request.form.get('email').strip().lower()
         password = request.form.get('password')
 
-        # Check if email already exists
         existing_user = Customer.query.filter_by(email=email).first()
         if existing_user:
             flash("Email already registered. Please log in.")
             return redirect(url_for('login'))
 
-        # Securely hash the password
         hashed_pw = generate_password_hash(password)
         new_customer = Customer(name=name, email=email, password_hash=hashed_pw)
         
@@ -103,7 +103,6 @@ def login():
         
         customer = Customer.query.filter_by(email=email).first()
         
-        # Verify user exists and password matches the hash
         if customer and check_password_hash(customer.password_hash, password):
             session['customer_id'] = customer.id
             session['customer_name'] = customer.name
@@ -141,7 +140,6 @@ def mybookings():
     if 'customer_id' not in session or session.get('is_admin'):
         return redirect(url_for('login'))
     
-    # Orders are now filtered by the secure customer ID
     user_orders = Order.query.filter_by(customer_id=session['customer_id']).order_by(Order.id.desc()).all()
     
     total_bookings = len(user_orders)
