@@ -1,64 +1,48 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_sqlalchemy import SQLAlchemy
 import os
-from urllib.parse import quote_plus
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'sweet_secret_key_123')
+app.secret_key = 'sweet_secret_key_123'
 
-# --- Database Setup ---
-# If DATABASE_URL is provided via environment, use it; otherwise, use the given MySQL credentials
-database_url = os.environ.get('DATABASE_URL')
-if not database_url:
-    # Credentials from your Railway MySQL connection
-    user = 'root'
-    password = 'kKkycgotIooqlusxJMgBNidinQIiOBLf'
-    host = 'crossover.proxy.rlwy.net'
-    port = '15725'
-    db_name = 'railway'
-    # URL‑encode password to handle special characters
-    encoded_password = quote_plus(password)
-    database_url = f"mysql+mysqlconnector://{user}:{encoded_password}@{host}:{port}/{db_name}"
-    print(f"Connecting to MySQL at {host}:{port}/{db_name}")
-
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+# --- 1. Database Setup (MySQL) ---
+# IMPORTANT: Change 'your_mysql_password' to your actual MySQL password. 
+# If you are using XAMPP and don't have a password, use: mysql+pymysql://root:@localhost/sweet_dessert_db
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:your_mysql_password@localhost/sweet_dessert_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# --- Models ---
+# --- 2. Database Models ---
 class AdminUser(db.Model):
-    __tablename__ = 'admin_users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
 
+class Product(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    price = db.Column(db.Integer, nullable=False)
+    img = db.Column(db.String(50), nullable=False)
+
 class Order(db.Model):
-    __tablename__ = 'orders'   # Avoid MySQL reserved word 'order'
     id = db.Column(db.Integer, primary_key=True)
     product_name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Integer, nullable=False)
     customer_name = db.Column(db.String(80), nullable=False)
     status = db.Column(db.String(20), default='Pending')
 
-# --- Menu Data ---
-menu_items = [
-    {"name": "Lou'a Nutella", "price": 349, "img": "nutella.png"},
-    {"name": "Lou'a Pistachio Lotus", "price": 349, "img": "pistachio.png"},
-    {"name": "Lou'a Kinder", "price": 349, "img": "kinder.png"},
-    {"name": "Cheese Bomb", "price": 290, "img": "cheese_bomb.png"},
-    {"name": "Kabsa Dessert", "price": 380, "img": "kabsa.png"}
-]
-
-# --- Public Routes ---
+# --- 3. Public Routes ---
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/menu')
 def menu():
-    return render_template('menu.html', menu=menu_items)
+    # Fetches the menu directly from your MySQL database
+    dynamic_menu = Product.query.all()
+    return render_template('menu.html', menu=dynamic_menu)
 
-# --- Customer Login (Name Only) ---
+# --- 4. Customer System ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -76,7 +60,6 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
-# --- Buying & Bookings ---
 @app.route('/buy/<name>/<int:price>')
 def buy(name, price):
     if 'customer_name' not in session or session.get('is_admin'):
@@ -120,7 +103,7 @@ def cancel_booking(order_id):
         db.session.commit()
     return redirect(url_for('mybookings'))
 
-# --- Admin Routes ---
+# --- 5. Admin System ---
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
@@ -152,18 +135,29 @@ def confirm_order(order_id):
         db.session.commit()
     return redirect(url_for('admin'))
 
-# --- Initialization ---
+# --- 6. Auto-Initialization ---
 if __name__ == '__main__':
     with app.app_context():
-        # Create tables if they don't exist (no drop_all!)
+        # Creates tables in MySQL if they don't exist
         db.create_all()
         
-        # Create default admin if not exists
+        # Auto-create Admin Account
         if not AdminUser.query.filter_by(username='admin').first():
             db.session.add(AdminUser(username='admin', password='123'))
             db.session.commit()
             print("Admin account created (admin / 123)")
-        else:
-            print("Admin account already exists")
-    
+            
+        # Auto-populate Menu Items if the table is empty
+        if Product.query.count() == 0:
+            default_items = [
+                Product(name="Lou'a Nutella", price=349, img="nutella.png"),
+                Product(name="Lou'a Pistachio Lotus", price=349, img="pistachio.png"),
+                Product(name="Lou'a Kinder", price=349, img="kinder.png"),
+                Product(name="Cheese Bomb", price=290, img="cheese_bomb.png"),
+                Product(name="Kabsa Dessert", price=380, img="kabsa.png")
+            ]
+            db.session.add_all(default_items)
+            db.session.commit()
+            print("Menu items added to MySQL database!")
+
     app.run(debug=True)
