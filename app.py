@@ -5,10 +5,9 @@ import os
 app = Flask(__name__)
 app.secret_key = 'sweet_secret_key_123'
 
-# --- 1. Database Setup (MySQL) ---
-# IMPORTANT: Change 'your_mysql_password' to your actual MySQL password. 
-# If you are using XAMPP and don't have a password, use: mysql+pymysql://root:@localhost/sweet_dessert_db
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:your_mysql_password@localhost/sweet_dessert_db'
+# --- 1. Database Setup (Render PostgreSQL) ---
+# PASTE YOUR RENDER INTERNAL DATABASE URL HERE:
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://your_render_username:your_render_password@your_render_hostname/your_db_name'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -38,7 +37,6 @@ def index():
 
 @app.route('/menu')
 def menu():
-    # Fetches the menu directly from your MySQL database
     dynamic_menu = Product.query.all()
     return render_template('menu.html', menu=dynamic_menu)
 
@@ -138,14 +136,14 @@ def confirm_order(order_id):
 # --- 6. Auto-Initialization ---
 if __name__ == '__main__':
     with app.app_context():
-        # Creates tables in MySQL if they don't exist
+        # Creates tables in the Cloud Database if they don't exist
         db.create_all()
         
         # Auto-create Admin Account
         if not AdminUser.query.filter_by(username='admin').first():
             db.session.add(AdminUser(username='admin', password='123'))
             db.session.commit()
-            print("Admin account created (admin / 123)")
+            print("Cloud Admin account created (admin / 123)")
             
         # Auto-populate Menu Items if the table is empty
         if Product.query.count() == 0:
@@ -158,6 +156,6 @@ if __name__ == '__main__':
             ]
             db.session.add_all(default_items)
             db.session.commit()
-            print("Menu items added to MySQL database!")
+            print("Menu items added to Cloud Database!")
 
     app.run(debug=True)
