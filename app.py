@@ -7,7 +7,6 @@ app = Flask(__name__)
 app.secret_key = 'sweet_secret_key_123'
 
 # --- 1. Database Setup (Render PostgreSQL) ---
-# PASTE YOUR RENDER INTERNAL DATABASE URL HERE:
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://sweet_dessert_db_user:T2ET8fNCErfgWD9hFtkcVTPPBczIllvW@dpg-d72oadeuk2gs73euhs8g-a/sweet_dessert_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -24,7 +23,7 @@ class Product(db.Model):
     price = db.Column(db.Integer, nullable=False)
     img = db.Column(db.String(50), nullable=False)
 
-# NEW: The Secure Customer Model
+# The Secure Customer Model
 class Customer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False)
@@ -35,20 +34,19 @@ class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     product_name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Integer, nullable=False)
-    # We now store the customer's unique ID, not just their name
     customer_id = db.Column(db.Integer, nullable=False) 
-    customer_name = db.Column(db.String(80), nullable=False) # Kept for easy admin viewing
+    customer_name = db.Column(db.String(80), nullable=False)
     status = db.Column(db.String(20), default='Pending')
 
 # --- 3. Auto-Initialization ---
 with app.app_context():
-    # If you get an error about "column customer_id doesn't exist", uncomment the line below for ONE run to reset the database, then comment it out again.
-    # db.drop_all() 
+    # db.drop_all() # Uncomment this line temporarily if you need to wipe old data
     db.create_all()
     
     if not AdminUser.query.filter_by(username='admin').first():
         db.session.add(AdminUser(username='admin', password='123'))
         db.session.commit()
+        print("Admin account verified")
         
     if Product.query.count() == 0:
         default_items = [
@@ -71,7 +69,7 @@ def menu():
     dynamic_menu = Product.query.all()
     return render_template('menu.html', menu=dynamic_menu)
 
-# --- 5. NEW Secure Customer System ---
+# --- 5. Secure Customer System ---
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -108,4 +106,95 @@ def login():
         # Verify user exists and password matches the hash
         if customer and check_password_hash(customer.password_hash, password):
             session['customer_id'] = customer.id
-            session['
+            session['customer_name'] = customer.name
+            session['is_admin'] = False
+            return redirect(url_for('menu'))
+        else:
+            flash("Invalid email or password.")
+            
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
+
+# --- 6. Buying & Bookings ---
+@app.route('/buy/<name>/<int:price>')
+def buy(name, price):
+    if 'customer_id' not in session or session.get('is_admin'):
+        flash("Please log in to your account before ordering!")
+        return redirect(url_for('login'))
+    
+    new_order = Order(
+        product_name=name, 
+        price=price, 
+        customer_id=session['customer_id'],
+        customer_name=session['customer_name']
+    )
+    db.session.add(new_order)
+    db.session.commit()
+    return redirect(url_for('mybookings'))
+
+@app.route('/mybookings')
+def mybookings():
+    if 'customer_id' not in session or session.get('is_admin'):
+        return redirect(url_for('login'))
+    
+    # Orders are now filtered by the secure customer ID
+    user_orders = Order.query.filter_by(customer_id=session['customer_id']).order_by(Order.id.desc()).all()
+    
+    total_bookings = len(user_orders)
+    confirmed_bookings = sum(1 for order in user_orders if order.status == 'Confirmed')
+    
+    return render_template('mybookings.html', 
+                           orders=user_orders, 
+                           customer_name=session['customer_name'],
+                           total=total_bookings,
+                           confirmed=confirmed_bookings)
+
+@app.route('/cancel_booking/<int:order_id>')
+def cancel_booking(order_id):
+    if 'customer_id' not in session:
+        return redirect(url_for('login'))
+        
+    order = Order.query.get(order_id)
+    if order and order.customer_id == session['customer_id'] and order.status == 'Pending':
+        order.status = 'Cancelled'
+        db.session.commit()
+    return redirect(url_for('mybookings'))
+
+# --- 7. Admin System ---
+@app.route('/admin_login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        admin = AdminUser.query.filter_by(username=request.form['username']).first()
+        if admin and admin.password == request.form['password']:
+            session['is_admin'] = True
+            session['admin_name'] = admin.username
+            return redirect(url_for('admin'))
+        else:
+            flash("Invalid Admin credentials!")
+    return render_template('admin_login.html')
+
+@app.route('/admin')
+def admin():
+    if not session.get('is_admin'):
+        return redirect(url_for('admin_login'))
+    
+    all_orders = Order.query.order_by(Order.id.desc()).all()
+    return render_template('admin.html', orders=all_orders)
+
+@app.route('/confirm_order/<int:order_id>')
+def confirm_order(order_id):
+    if not session.get('is_admin'):
+        return redirect(url_for('admin_login'))
+    
+    order = Order.query.get(order_id)
+    if order and order.status == 'Pending':
+        order.status = 'Confirmed'
+        db.session.commit()
+    return redirect(url_for('admin'))
+
+if __name__ == '__main__':
+    app.run(debug=True)
