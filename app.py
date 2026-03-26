@@ -3,21 +3,32 @@ from flask_sqlalchemy import SQLAlchemy
 import os
 
 app = Flask(__name__)
-app.secret_key = 'sweet_secret_key_123'
+app.secret_key = os.environ.get('SECRET_KEY', 'sweet_secret_key_123')
 
 # --- Database Setup ---
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
+# Use MySQL on Railway if DATABASE_URL is set, otherwise SQLite for local dev
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    # If the URL starts with mysql://, replace with mysql+mysqlconnector://
+    if database_url.startswith('mysql://'):
+        database_url = database_url.replace('mysql://', 'mysql+mysqlconnector://')
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # --- Models ---
 class AdminUser(db.Model):
+    __tablename__ = 'admin_users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
 
 class Order(db.Model):
+    __tablename__ = 'orders'  # Avoid reserved keyword 'order'
     id = db.Column(db.Integer, primary_key=True)
     product_name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Integer, nullable=False)
@@ -84,7 +95,6 @@ def mybookings():
     current_user = session['customer_name']
     user_orders = Order.query.filter_by(customer_name=current_user).order_by(Order.id.desc()).all()
     
-    # Calculate simple statistics for the user
     total_bookings = len(user_orders)
     confirmed_bookings = sum(1 for order in user_orders if order.status == 'Confirmed')
     
@@ -100,7 +110,6 @@ def cancel_booking(order_id):
         return redirect(url_for('login'))
         
     order = Order.query.get(order_id)
-    # Ensure they can only cancel their own pending orders
     if order and order.customer_name == session['customer_name'] and order.status == 'Pending':
         order.status = 'Cancelled'
         db.session.commit()
@@ -138,17 +147,18 @@ def confirm_order(order_id):
         db.session.commit()
     return redirect(url_for('admin'))
 
-# --- Initialization ---
+# --- Initialization (create tables and default admin) ---
 if __name__ == '__main__':
     with app.app_context():
-        # Drop all tables and recreate them to apply the new schema
-        db.drop_all() 
+        # Create tables if they don't exist (no drop_all!)
         db.create_all()
         
-        # Create default admin
+        # Create default admin if not exists
         if not AdminUser.query.filter_by(username='admin').first():
             db.session.add(AdminUser(username='admin', password='123'))
             db.session.commit()
-            print("Database reset and Admin account created (admin / 123)")
-            
+            print("Admin account created (admin / 123)")
+        else:
+            print("Admin account already exists")
+    
     app.run(debug=True)
