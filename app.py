@@ -5,13 +5,8 @@ import os
 app = Flask(__name__)
 app.secret_key = 'sweet_secret_key_123'
 
-# =====================================================================
-# 🚨 CRITICAL: YOUR DATABASE URL GOES HERE 🚨
-# 1. Copy the "Internal Database URL" from your Render PostgreSQL dashboard.
-# 2. Paste it inside the quotes on Line 13 below.
-# 3. If your URL starts with "postgres://", you MUST change it to "postgresql://" 
-# =====================================================================
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://REPLACE_THIS_ENTIRE_STRING_WITH_YOUR_RENDER_URL'
+# --- Database Setup (Render PostgreSQL) ---
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://sweet_dessert_db_user:T2ET8fNCErfgWD9hFtkcVTPPBczIllvW@dpg-d72oadeuk2gs73euhs8g-a/sweet_dessert_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
