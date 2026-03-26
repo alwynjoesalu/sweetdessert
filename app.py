@@ -1,22 +1,27 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_sqlalchemy import SQLAlchemy
 import os
+from urllib.parse import quote_plus
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'sweet_secret_key_123')
 
 # --- Database Setup ---
-# Use MySQL on Railway if DATABASE_URL is set, otherwise SQLite for local dev
+# If DATABASE_URL is provided via environment, use it; otherwise, use the given MySQL credentials
 database_url = os.environ.get('DATABASE_URL')
-if database_url:
-    # If the URL starts with mysql://, replace with mysql+mysqlconnector://
-    if database_url.startswith('mysql://'):
-        database_url = database_url.replace('mysql://', 'mysql+mysqlconnector://')
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-else:
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
+if not database_url:
+    # Credentials from your Railway MySQL connection
+    user = 'root'
+    password = 'kKkycgotIooqlusxJMgBNidinQIiOBLf'
+    host = 'crossover.proxy.rlwy.net'
+    port = '15725'
+    db_name = 'railway'
+    # URL‑encode password to handle special characters
+    encoded_password = quote_plus(password)
+    database_url = f"mysql+mysqlconnector://{user}:{encoded_password}@{host}:{port}/{db_name}"
+    print(f"Connecting to MySQL at {host}:{port}/{db_name}")
 
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -28,7 +33,7 @@ class AdminUser(db.Model):
     password = db.Column(db.String(120), nullable=False)
 
 class Order(db.Model):
-    __tablename__ = 'orders'  # Avoid reserved keyword 'order'
+    __tablename__ = 'orders'   # Avoid MySQL reserved word 'order'
     id = db.Column(db.Integer, primary_key=True)
     product_name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Integer, nullable=False)
@@ -147,7 +152,7 @@ def confirm_order(order_id):
         db.session.commit()
     return redirect(url_for('admin'))
 
-# --- Initialization (create tables and default admin) ---
+# --- Initialization ---
 if __name__ == '__main__':
     with app.app_context():
         # Create tables if they don't exist (no drop_all!)
