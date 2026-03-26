@@ -30,7 +30,33 @@ class Order(db.Model):
     customer_name = db.Column(db.String(80), nullable=False)
     status = db.Column(db.String(20), default='Pending')
 
-# --- 3. Public Routes ---
+# --- 3. Auto-Initialization (Fixed for Gunicorn/Render) ---
+# By placing this outside the "if __name__ == '__main__':" block, 
+# Gunicorn will execute it when it starts up your cloud server!
+with app.app_context():
+    # Creates tables in the Cloud Database if they don't exist
+    db.create_all()
+    
+    # Auto-create Admin Account
+    if not AdminUser.query.filter_by(username='admin').first():
+        db.session.add(AdminUser(username='admin', password='123'))
+        db.session.commit()
+        print("Cloud Admin account created (admin / 123)")
+        
+    # Auto-populate Menu Items if the table is empty
+    if Product.query.count() == 0:
+        default_items = [
+            Product(name="Lou'a Nutella", price=349, img="nutella.png"),
+            Product(name="Lou'a Pistachio Lotus", price=349, img="pistachio.png"),
+            Product(name="Lou'a Kinder", price=349, img="kinder.png"),
+            Product(name="Cheese Bomb", price=290, img="cheese_bomb.png"),
+            Product(name="Kabsa Dessert", price=380, img="kabsa.png")
+        ]
+        db.session.add_all(default_items)
+        db.session.commit()
+        print("Menu items added to Cloud Database!")
+
+# --- 4. Public Routes ---
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -40,7 +66,7 @@ def menu():
     dynamic_menu = Product.query.all()
     return render_template('menu.html', menu=dynamic_menu)
 
-# --- 4. Customer System ---
+# --- 5. Customer System ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -101,7 +127,7 @@ def cancel_booking(order_id):
         db.session.commit()
     return redirect(url_for('mybookings'))
 
-# --- 5. Admin System ---
+# --- 6. Admin System ---
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
@@ -133,29 +159,6 @@ def confirm_order(order_id):
         db.session.commit()
     return redirect(url_for('admin'))
 
-# --- 6. Auto-Initialization ---
+# --- 7. Local Server Runner ---
 if __name__ == '__main__':
-    with app.app_context():
-        # Creates tables in the Cloud Database if they don't exist
-        db.create_all()
-        
-        # Auto-create Admin Account
-        if not AdminUser.query.filter_by(username='admin').first():
-            db.session.add(AdminUser(username='admin', password='123'))
-            db.session.commit()
-            print("Cloud Admin account created (admin / 123)")
-            
-        # Auto-populate Menu Items if the table is empty
-        if Product.query.count() == 0:
-            default_items = [
-                Product(name="Lou'a Nutella", price=349, img="nutella.png"),
-                Product(name="Lou'a Pistachio Lotus", price=349, img="pistachio.png"),
-                Product(name="Lou'a Kinder", price=349, img="kinder.png"),
-                Product(name="Cheese Bomb", price=290, img="cheese_bomb.png"),
-                Product(name="Kabsa Dessert", price=380, img="kabsa.png")
-            ]
-            db.session.add_all(default_items)
-            db.session.commit()
-            print("Menu items added to Cloud Database!")
-
     app.run(debug=True)
