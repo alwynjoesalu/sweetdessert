@@ -1,0 +1,9 @@
+/* static/style.css */
+body { font-family: 'Segoe UI', sans-serif; background-color: #f0faff; margin: 0; color: #0056b3; }
+.navbar { background: #00a8ff; padding: 1rem; color: white; display: flex; justify-content: space-between; }
+.container { padding: 20px; display: flex; flex-wrap: wrap; justify-content: center; }
+.card { background: white; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+        margin: 15px; padding: 20px; width: 250px; text-align: center; }
+.btn { background: #00a8ff; color: white; border: none; padding: 10px 20px; 
+       border-radius: 20px; cursor: pointer; text-decoration: none; }
+.price { font-size: 1.5rem; font-weight: bold; margin: 10px 0; }

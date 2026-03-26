@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel | Bookings</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Nunito', sans-serif; background: #333; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; min-height: 100vh;}
+        .content { flex: 1; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; color: #333; border-radius: 10px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #00a8ff; color: white; font-family: 'Fredoka One'; letter-spacing: 1px;}
+        .btn-confirm { background: #00cc66; color: white; padding: 8px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; }
+        .status-confirmed { color: #00cc66; font-weight: bold; }
+        .status-pending { color: orange; font-weight: bold; }
+        .status-cancelled { color: #ff4757; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1 style="font-family: 'Fredoka One'; color: #00a8ff; margin: 0;">All Customer Bookings</h1>
+            <a href="/logout" style="color: white; text-decoration: none; font-weight: bold;">Logout Admin</a>
+        </div>
+        
+        <table>
+            <tr>
+                <th>Booking ID</th>
+                <th>Customer Name</th>
+                <th>Item Ordered</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+            {% for order in orders %}
+            <tr>
+                <td>#{{ order.id }}</td>
+                <td style="font-weight: bold;">{{ order.customer_name }}</td>
+                <td>{{ order.product_name }}</td>
+                <td>₹{{ order.price }}</td>
+                <td>
+                    {% if order.status == 'Pending' %}
+                        <span class="status-pending">Pending</span>
+                    {% elif order.status == 'Confirmed' %}
+                        <span class="status-confirmed">Confirmed</span>
+                    {% else %}
+                        <span class="status-cancelled">Cancelled</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if order.status == 'Pending' %}
+                        <a href="/confirm_order/{{ order.id }}" class="btn-confirm">Confirm Order</a>
+                    {% elif order.status == 'Confirmed' %}
+                        <span style="color: grey;">Approved</span>
+                    {% else %}
+                        <span style="color: grey;">N/A</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <footer style="text-align: center; padding: 20px; margin-top: 40px; border-top: 1px solid #555;">
+        <p style="color: #aaa; font-size: 0.9rem; margin: 0;">
+            &copy; 2026 Sweet Dessert Admin Portal
+        </p>
+    </footer>
+</body>
+</html>
