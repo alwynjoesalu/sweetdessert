@@ -5,13 +5,17 @@ import os
 app = Flask(__name__)
 app.secret_key = 'sweet_secret_key_123'
 
-# --- 1. Database Setup (Render PostgreSQL) ---
-# PASTE YOUR RENDER INTERNAL DATABASE URL HERE:
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://your_render_username:your_render_password@your_render_hostname/your_db_name'
+# =====================================================================
+# 🚨 CRITICAL: YOUR DATABASE URL GOES HERE 🚨
+# 1. Copy the "Internal Database URL" from your Render PostgreSQL dashboard.
+# 2. Paste it inside the quotes on Line 13 below.
+# 3. If your URL starts with "postgres://", you MUST change it to "postgresql://" 
+# =====================================================================
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://REPLACE_THIS_ENTIRE_STRING_WITH_YOUR_RENDER_URL'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# --- 2. Database Models ---
+# --- Database Models ---
 class AdminUser(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -30,18 +34,16 @@ class Order(db.Model):
     customer_name = db.Column(db.String(80), nullable=False)
     status = db.Column(db.String(20), default='Pending')
 
-# --- 3. Auto-Initialization (Fixed for Gunicorn/Render) ---
-# By placing this outside the "if __name__ == '__main__':" block, 
-# Gunicorn will execute it when it starts up your cloud server!
+# --- Auto-Initialization (Fixed for Render/Gunicorn) ---
+# This runs immediately when Render boots up the server
 with app.app_context():
-    # Creates tables in the Cloud Database if they don't exist
     db.create_all()
     
-    # Auto-create Admin Account
+    # Auto-create Admin Account if it doesn't exist
     if not AdminUser.query.filter_by(username='admin').first():
         db.session.add(AdminUser(username='admin', password='123'))
         db.session.commit()
-        print("Cloud Admin account created (admin / 123)")
+        print("Cloud Admin account created")
         
     # Auto-populate Menu Items if the table is empty
     if Product.query.count() == 0:
@@ -56,7 +58,7 @@ with app.app_context():
         db.session.commit()
         print("Menu items added to Cloud Database!")
 
-# --- 4. Public Routes ---
+# --- Public Routes ---
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -66,7 +68,7 @@ def menu():
     dynamic_menu = Product.query.all()
     return render_template('menu.html', menu=dynamic_menu)
 
-# --- 5. Customer System ---
+# --- Customer System ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -127,7 +129,7 @@ def cancel_booking(order_id):
         db.session.commit()
     return redirect(url_for('mybookings'))
 
-# --- 6. Admin System ---
+# --- Admin System ---
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
@@ -159,6 +161,6 @@ def confirm_order(order_id):
         db.session.commit()
     return redirect(url_for('admin'))
 
-# --- 7. Local Server Runner ---
+# --- Local Server Runner ---
 if __name__ == '__main__':
     app.run(debug=True)
